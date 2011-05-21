@@ -1,39 +1,53 @@
 -module(proc_sieve).
 
 -export([generate/1]).
--export([sieve2/1]).
+-export([sieve2/2]).
 
 -define(TRACE(X), io:format("{~p,~p}: ~p~n", [?MODULE,?LINE,X])).
+-define(TIMEOUT, 1000000).
 
-
-is_multiple_of(_, []) ->
-    false;
-is_multiple_of(N, [H|T]) when N rem H /= 0 ->
-    is_multiple_of(N, T);
-is_multiple_of(N, [H|_]) when N rem H == 0 ->
-    true.
-
-sieve2([]) ->
-    receive
-        N -> void
-    end,
-    sieve2([N]); 
-        
-sieve2(Res) ->
+sieve2(0, InvalidPid) ->
     receive 
-        {done, From} -> 
-            From ! Res;
-        N -> 
-            case is_multiple_of(N, Res) of
-            true ->
-                sieve2(Res); %% this semicolon is needed
-            false ->
-                sieve2(Res ++ [N]) %% put semicolon here causes syntax error
-            end %% end if 
+        P -> sieve2(P, InvalidPid)
+    after ?TIMEOUT ->
+        ?TRACE("time out in P=0~n")
+    end; 
+
+%% starting condition
+sieve2(P, NextPid) when is_pid(NextPid) ->
+    receive 
+        {done, From} ->
+            NextPid ! {done, self()},
+            receive 
+                LstOfRes -> 
+                    From ! [P] ++ LstOfRes 
+            end;
+        N when N rem P == 0 -> 
+            sieve2(P, NextPid); %% this semicolon is needed
+        N when N rem P /= 0 -> 
+            NextPid ! N,
+            sieve2(P, NextPid) %% put semicolon here causes syntax error
+    after ?TIMEOUT ->
+        ?TRACE(io:format("time out in is_pid clause P=~p~n", [P]))
+    end;
+ sieve2(P, Invalid) ->
+    receive 
+        {done, From} ->
+            %% no downstream process, just send the result back 
+            From ! [P];
+        N when N rem P == 0 -> 
+            sieve2(P, Invalid); %% this semicolon is needed
+        N when N rem P /= 0 -> 
+            ?TRACE(io:format("Starting ~p for ~p~n", [self(), N])), 
+            Pid = spawn(proc_sieve, sieve2, [0, void]),
+            Pid ! N,
+            sieve2(P, Pid) %% put semicolon here causes syntax error
+    after ?TIMEOUT ->
+        ?TRACE(io:format("time out in no pid clause P=~p~n", [P]))
     end.
     
 sieve() ->
-    spawn(proc_sieve, sieve2, [[]]).
+    spawn(proc_sieve, sieve2, [0, void]).
 
 generate(MaxN) ->
         Pid = sieve(),

@@ -6,6 +6,10 @@
 -define(TRACE(X), io:format("{~p,~p}: ~p~n", [?MODULE,?LINE,X])).
 -define(TIMEOUT, 1000000).
 
+%%
+%% Use processes/0 to check if there is any process leak
+%% 
+
 sieve2(0, InvalidPid) ->
     receive 
         P -> sieve2(P, InvalidPid)

@@ -30,30 +30,49 @@ prime_factors2(N, Result, M) when N rem M =:= 0
 
 
 is_square_multiple(N) ->
-    Res = fmf([], prime_factors(N)),
+    Res = prime_factor_freq([], prime_factors(N)),
     Res2 = lists:filter(fun({_, F}) -> F > 1 end, Res),
     length(Res2) >= 1.
 
-fmf(Res, [H|T]) ->
+
+prime_factor_freq(Res, [H|T]) ->
     FullLen = length([H|T]),
     Tmp = lists:filter(fun(X) -> X =/= H end, T),
-    fmf([{H, FullLen - length(Tmp)}] ++ Res, Tmp);
-    fmf(Res, []) ->
+    prime_factor_freq([{H, FullLen - length(Tmp)}] ++ Res, Tmp);
+prime_factor_freq(Res, []) ->
     Res.
 
 %% By definition the Count must be bigger than 1
 is_square_multiple2(N, Count) when Count > 1 ->
-    Res = fmf([], prime_factors(N)),
+    Res = prime_factor_freq([], prime_factors(N)),
     Res2 = lists:filter(fun({_, F}) -> F >= Count end, Res),
     length(Res2) >= 1.
 
-
+%% Part 5
+%% Examples
+%% 20> mobius:find_square_multiples(3, 50).
+%% 48
+%% 21> mobius:find_square_multiples(3, 20).
+%% fail
 find_square_multiples(Count, MaxN) ->
-    fsm(Count, MaxN, is_square_multiple2(MaxN, Count)).
+    find_square_multiples2(Count, MaxN, []).
 
-fsm(_Count, Counter, true) ->
-    Counter;
-fsm(_, 2, _) ->
+
+%%
+%% from 2 to MaxN
+%%
+%% Walking backwards
+%%
+find_square_multiples2(Count, ToTest, Found) when erlang:length(Found) == Count  -> 
+    %% io:format("~w~n", [Found]),
+    ToTest+1;
+find_square_multiples2(_, 2, _) ->
     fail; %% search failed
-fsm(Count, Counter, false) ->
-    fsm(Count, Counter-1, is_square_multiple2(Counter-1, Count)).
+find_square_multiples2(Count, ToTest, Found) ->
+    case is_square_multiple(ToTest) of 
+        true -> NewFound = Found ++ [ToTest];
+        _ -> NewFound = [] % reset
+    end,
+    % io:format("~w~n", [NewFound]),
+    find_square_multiples2(Count, ToTest-1, NewFound).
+

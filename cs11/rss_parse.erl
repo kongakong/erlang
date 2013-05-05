@@ -47,7 +47,6 @@ test1(F) ->
     is_rss2_feed(XML).
 
 test2(F) ->
-    F = "digg-science-rss1.xml",
     {XML, _} = xmerl_scan:file(F),
     % get_feed_items(XML).
     map(fun get_item_time/1, get_feed_items(XML)).

@@ -1,7 +1,7 @@
 -module(rss_parse).
 
 -export([is_rss2_feed/1, compare_feed_items/2]).
--export([test/0, test1/1, test2/1, test3/1]).
+-export([getitem/0, test/0, test1/1, test2/1, test3/1]).
 
 %% -include does not work for library
 %% otherwise it will give 'cannot find file' error
@@ -47,6 +47,7 @@ get_item_time(Item) ->
 %
 extract_xml(Elem = #xmlElement{}) ->
     Elem#xmlElement{parents=[], pos=0,
+	namespace=nil, % try to simplify the structure
         content=lists:map(fun extract_xml/1, Elem#xmlElement.content),
         attributes=lists:map(fun extract_xml/1, Elem#xmlElement.attributes)};
 extract_xml(Attr = #xmlAttribute{}) ->
@@ -58,17 +59,39 @@ extract_xml(Comment = #xmlComment{}) ->
 extract_xml(Other) ->
     Other.
 
-compare_feed_items(OldItem, NewItem) ->
-    OldItem2 = extract_xml(OldItem),
-    NewItem2 = extract_xml(NewItem),
-    io:format("LHS: ~p~n", [OldItem2]),
-    io:format("RHS: ~p~n", [NewItem2]),
-    compare_feed_normalised_items(OldItem2, NewItem2).
+collect_feed_item_data(Item) when is_record(Item, xmlElement) ->
+    [Guid] = xmerl_xpath:string("guid/text()", Item),
+    io:format("Guid: ~p~n", [Guid]),
+    [Title] = xmerl_xpath:string("title/text()", Item),
+    io:format("Title: ~p~n", [Title]),
+    [Link] = xmerl_xpath:string("link/text()", Item),
+    io:format("Link: ~p~n", [Link]),
+    [PubDate] = xmerl_xpath:string("pubDate/text()", Item),
+    [Guid, Title, Link, PubDate].
 
-compare_feed_normalised_items(OldItem, NewItem) 
-      when OldItem#xmlElement.name =:= NewItem#xmlElement.name -> 
+compare_feed_items(OldItem, NewItem) when 
+          is_record(OldItem, xmlElement),
+          is_record(NewItem, xmlElement)->
+    OldItem2 = extract_xml(OldItem), %% normalise structure
+    NewItem2 = extract_xml(NewItem),
+    %% io:format("LHS: ~p~n", [OldItem2]),
+    [GuidNode] = xmerl_xpath:string("guid/text()", NewItem2),
+    io:format("GuidNode: ~p~n", [GuidNode]),
+    Guid = GuidNode#xmlText.value,
+    io:format("RHS: ~p~n", [Guid]).
+    %%compare_feed_normalised_items(OldItem2, NewItem2).
+
+%% assuming identity means
+%% guid, title and link are the same
+
+compare_feed_normalised_items(OldItem, NewItem) when
+          is_record(OldItem, xmlElement),
+          is_record(NewItem, xmlElement),
+          OldItem#xmlElement.name =:= NewItem#xmlElement.name -> 
 	      same;
 compare_feed_normalised_items(OldItem, NewItem) ->
+    [Guid1, Title1, Link1] = collect_feed_item_data(OldItem),
+    [Guid2, Title2, Link2] = collect_feed_item_data(NewItem),
     updated;
 compare_feed_normalised_items(OldItem, NewItem) ->
     different.
@@ -78,6 +101,13 @@ compare_feed_normalised_items(OldItem, NewItem) ->
 
 %% Helper function for quick testing
 %% 
+getitem() ->
+    %% get some item to play with
+    F = "digg-science-rss1.xml",
+    {XML, _} = xmerl_scan:file(F),
+    [X1| _] = get_feed_items(XML),
+    extract_xml(X1).
+
 test() ->
     test3("digg-science-rss1.xml").
 

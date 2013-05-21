@@ -61,40 +61,36 @@ extract_xml(Other) ->
 
 collect_feed_item_data(Item) when is_record(Item, xmlElement) ->
     [Guid] = xmerl_xpath:string("guid/text()", Item),
-    io:format("Guid: ~p~n", [Guid]),
+    %% io:format("Guid: ~p~n", [Guid]),
     [Title] = xmerl_xpath:string("title/text()", Item),
-    io:format("Title: ~p~n", [Title]),
+    %% io:format("Title: ~p~n", [Title]),
     [Link] = xmerl_xpath:string("link/text()", Item),
-    io:format("Link: ~p~n", [Link]),
+    %% io:format("Link: ~p~n", [Link]),
     [PubDate] = xmerl_xpath:string("pubDate/text()", Item),
     [Guid, Title, Link, PubDate].
-
-compare_feed_items(OldItem, NewItem) when 
-          is_record(OldItem, xmlElement),
-          is_record(NewItem, xmlElement)->
-    OldItem2 = extract_xml(OldItem), %% normalise structure
-    NewItem2 = extract_xml(NewItem),
-    %% io:format("LHS: ~p~n", [OldItem2]),
-    [GuidNode] = xmerl_xpath:string("guid/text()", NewItem2),
-    io:format("GuidNode: ~p~n", [GuidNode]),
-    Guid = GuidNode#xmlText.value,
-    io:format("RHS: ~p~n", [Guid]).
-    %%compare_feed_normalised_items(OldItem2, NewItem2).
 
 %% assuming identity means
 %% guid, title and link are the same
 
-compare_feed_normalised_items(OldItem, NewItem) when
-          is_record(OldItem, xmlElement),
-          is_record(NewItem, xmlElement),
-          OldItem#xmlElement.name =:= NewItem#xmlElement.name -> 
-	      same;
-compare_feed_normalised_items(OldItem, NewItem) ->
-    [Guid1, Title1, Link1] = collect_feed_item_data(OldItem),
-    [Guid2, Title2, Link2] = collect_feed_item_data(NewItem),
+compare_feed_normalised_items(Guid, Title, Link, PubDate, Guid, Title, Link, PubDate) ->
+    same;
+compare_feed_normalised_items(Guid, _, _, _, Guid, _, _, _) ->
     updated;
-compare_feed_normalised_items(OldItem, NewItem) ->
+compare_feed_normalised_items(_, Title, _, _, _, Title, _, _) ->
+    updated;
+compare_feed_normalised_items(_, _, Link, _, _, _, Link, _) ->
+    updated;
+compare_feed_normalised_items(_, _, _, _, _, _, _, _) ->
     different.
+
+compare_feed_items(OldItem, NewItem) when 
+          is_record(OldItem, xmlElement),
+          is_record(NewItem, xmlElement)->
+    [Guid1, Title1, Link1, PubDate1] = collect_feed_item_data(OldItem),
+    [Guid2, Title2, Link2, PubDate2] = collect_feed_item_data(NewItem),
+    compare_feed_normalised_items(Guid1, Title1, Link1, PubDate1, Guid2, Title2, Link2, PubDate2).
+
+
 
 
 
@@ -123,5 +119,5 @@ test2(F) ->
 test3(F) ->
     {XML, _} = xmerl_scan:file(F),
     [X1, X2| _] = get_feed_items(XML),
-    compare_feed_items(X1, X2).
+    [compare_feed_items(X1, X2), compare_feed_items(X1, X1)].
 
